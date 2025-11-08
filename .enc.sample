@@ -1,0 +1,2 @@
+PORT=8000
+MONGODB_URL=mongodb+srv://codingMaster:abcd1234@programming.ewg7pqp.mongodb.net
