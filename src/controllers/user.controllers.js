@@ -1,13 +1,13 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
-import {ApiError} from "../utils/ApiError.js"
-import { User} from "../models/user.model.js"
-import {uploadOnCloudinary} from "../utils/cloudinary.js"
+import { ApiError } from "../utils/ApiError.js"
+import { User } from "../models/user.model.js"
+import { uploadOnCloudinary } from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken"
 import mongoose from "mongoose";
 
 
-const generateAccessAndRefereshTokens = async(userId) =>{
+const generateAccessAndRefereshTokens = async(userId) => {
     try {
         const user = await User.findById(userId)
         const accessToken = user.generateAccessToken()
@@ -17,7 +17,6 @@ const generateAccessAndRefereshTokens = async(userId) =>{
         await user.save({ validateBeforeSave: false })
 
         return {accessToken, refreshToken}
-
 
     } catch (error) {
         throw new ApiError(500, "Something went wrong while generating referesh and access token")
@@ -35,9 +34,7 @@ const registerUser = asyncHandler( async (req, res) => {
     // check for user creation
     // return res
 
-
     const {fullName, email, username, password } = req.body
-    //console.log("email: ", email);
 
     if (
         [fullName, email, username, password].some((field) => field?.trim() === "")
@@ -52,28 +49,39 @@ const registerUser = asyncHandler( async (req, res) => {
     if (existedUser) {
         throw new ApiError(409, "User with email or username already exists")
     }
-    //console.log(req.files);
+    
+    console.log("req.files:", req.files);
 
-    const avatarLocalPath = req.files?.avatar[0]?.path;
-    //const coverImageLocalPath = req.files?.coverImage[0]?.path;
+    // Check if avatar file exists before accessing it
+    if (!req.files || !req.files.avatar || req.files.avatar.length === 0) {
+        throw new ApiError(400, "Avatar file is required")
+    }
 
+    const avatarLocalPath = req.files.avatar[0].path;
+    
+    // Fixed: Log the path string, not the entire object
+    console.log('===== AVATAR DEBUG =====');
+    console.log('Avatar local path:', avatarLocalPath);
+    console.log('Type:', typeof avatarLocalPath);
+    console.log('========================');
+
+    // Handle coverImage with proper checking
     let coverImageLocalPath;
     if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
         coverImageLocalPath = req.files.coverImage[0].path
     }
-    
 
-    if (!avatarLocalPath) {
-        throw new ApiError(400, "Avatar file is required")
-    }
-
+    // Upload to cloudinary
+    console.log('Starting Cloudinary upload...');
     const avatar = await uploadOnCloudinary(avatarLocalPath)
     const coverImage = await uploadOnCloudinary(coverImageLocalPath)
 
+    // Check if avatar upload was successful
     if (!avatar) {
-        throw new ApiError(400, "Avatar file is required")
+        throw new ApiError(400, "Avatar upload to Cloudinary failed")
     }
-   
+
+    console.log('Avatar uploaded successfully:', avatar.url);
 
     const user = await User.create({
         fullName,
@@ -96,15 +104,15 @@ const registerUser = asyncHandler( async (req, res) => {
         new ApiResponse(200, createdUser, "User registered Successfully")
     )
 
-} )
+})
 
-const loginUser = asyncHandler(async (req, res) =>{
+const loginUser = asyncHandler(async (req, res) => {
     // req body -> data
     // username or email
-    //find the user
-    //password check
-    //access and referesh token
-    //send cookie
+    // find the user
+    // password check
+    // access and referesh token
+    // send cookie
 
     const {email, username, password} = req.body
     console.log(email);
@@ -112,12 +120,6 @@ const loginUser = asyncHandler(async (req, res) =>{
     if (!username && !email) {
         throw new ApiError(400, "username or email is required")
     }
-    
-    // Here is an alternative of above code based on logic discussed in video:
-    // if (!(username || email)) {
-    //     throw new ApiError(400, "username or email is required")
-        
-    // }
 
     const user = await User.findOne({
         $or: [{username}, {email}]
@@ -127,13 +129,13 @@ const loginUser = asyncHandler(async (req, res) =>{
         throw new ApiError(404, "User does not exist")
     }
 
-   const isPasswordValid = await user.isPasswordCorrect(password)
+    const isPasswordValid = await user.isPasswordCorrect(password)
 
-   if (!isPasswordValid) {
-    throw new ApiError(401, "Invalid user credentials")
+    if (!isPasswordValid) {
+        throw new ApiError(401, "Invalid user credentials")
     }
 
-   const {accessToken, refreshToken} = await generateAccessAndRefereshTokens(user._id)
+    const {accessToken, refreshToken} = await generateAccessAndRefereshTokens(user._id)
 
     const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
 
@@ -204,7 +206,6 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     
         if (incomingRefreshToken !== user?.refreshToken) {
             throw new ApiError(401, "Refresh token is expired or used")
-            
         }
     
         const options = {
@@ -230,8 +231,6 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     }
 
 })
-
-
 
 export {
     registerUser,
